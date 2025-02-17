@@ -1,3 +1,6 @@
+NOTE: This is just for a college assignment, [here is the original](https://github.com/Farama-Foundation/MicroRTS)
+
+
 <p align="center">
     <img src="microrts-text.png" width="500px"/>
 </p>

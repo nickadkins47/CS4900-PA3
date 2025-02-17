@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package mayariBot;
+package mayaripp; // Mayari++
 
 import ai.abstraction.pathfinding.AStarPathFinding;
 import ai.core.AI;
@@ -35,7 +35,7 @@ import rts.units.UnitTypeTable;
  * 
  * version 2.0
 */
-public class mayari extends AIWithComputationBudget {
+public class mayaripp extends AIWithComputationBudget {
         
     public class Pos {
         int _x;
@@ -186,7 +186,7 @@ public class mayari extends AIWithComputationBudget {
         return astarMove;
     }
 
-    public mayari(UnitTypeTable utt) {
+    public mayaripp(UnitTypeTable utt) {
         super(-1, -1);
         _utt = utt;
         restartPathFind(); //FloodFillPathFinding(); //AStarPathFinding();
@@ -205,7 +205,7 @@ public class mayari extends AIWithComputationBudget {
     }
     @Override
     public AI clone() {
-        return new mayari(_utt);
+        return new mayaripp(_utt);
     }
     @Override
     public List<ParameterSpecification> getParameters() {
