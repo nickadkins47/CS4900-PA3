@@ -12,19 +12,8 @@ bot_jar = $(bot_bin)/$(bot_name).jar
 bot_cls = $(bot_bin)/$(bot_name)*.class
 bot_src = $(bot_dir)/$(bot_name).java
 
-#################################################################
-
-.PHONY: default run_full clean clean_bin clean_bot
-
-default: run_full
-
-clean: clean_bin clean_bot
-
-clean_bin:
-	@rm -rf bin
-
-clean_bot:
-	@rm -rf $(bot_trg) $(bot_jar) $(bot_cls)
+.PHONY: default
+default: rs
 
 #################################################################
 # Run Game
@@ -35,9 +24,9 @@ rf run_full: $(target) # Run MicroRTS
 	@echo "Running Full Game ..."
 	@cd bin && java -cp microrts.jar rts.MicroRTS
 
-rs run_single:
+rs run_single: bin
 	@echo "Running Round ..."
-	@java -cp "bin/*" mayaripp/GameVisualSimulationTest.java
+	@java -cp "bin/*:lib/*" mayaripp/test_run.java
 
 #################################################################
 # Compile Game
@@ -51,7 +40,7 @@ comp $(target): bin
 
 # 1: compile source files
 # 2: extract the contents of the JAR dependencies
-bin $(GVSim_cls): lib src $(shell find lib -name "*.jar") | $(bot_trg)
+bin: lib src | $(bot_trg)
 	@echo "Compiling ./src ..."
 	@javac -cp "lib/*:src" -d bin $(shell find . -name "*.java")
 	@echo "Extracting Dependencies from ./lib ..."
@@ -70,3 +59,15 @@ jar $(bot_jar): $(bot_cls)
 
 $(bot_cls): $(bot_src)
 	@javac -cp "lib/*:src" -d $(bot_dir) $<
+
+#################################################################
+
+.PHONY: clean clean_bin clean_bot
+
+clean: clean_bin clean_bot
+
+clean_bin:
+	@rm -rf bin
+
+clean_bot:
+	@rm -rf $(bot_trg) $(bot_jar) $(bot_cls)

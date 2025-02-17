@@ -15,13 +15,15 @@ import rts.PhysicalGameState;
 import rts.PlayerAction;
 import rts.units.UnitTypeTable;
 
-import mayaripp.mayaripp;
+import mayariBot.mayari;
+import mayaripp.mayaripp; //My Bot
+
 
  /**
  *
  * @author santi
  */
-public class GameVisualSimulationTest {
+class GameVisualSimulationTest {
     public static void main(String[] args) throws Exception {
         UnitTypeTable utt = new UnitTypeTable();
         PhysicalGameState pgs = PhysicalGameState.load("maps/16x16/basesWorkers16x16.xml", utt);
@@ -32,9 +34,8 @@ public class GameVisualSimulationTest {
         int PERIOD = 20;
         boolean gameover = false;
         
-        //AI ai1 = new mayaripp(utt);
         AI ai1 = new mayaripp(utt);
-        AI ai2 = new WorkerRush(utt, new BFSPathFinding());
+        AI ai2 = getBotFromArg(args, utt);
 
         JFrame w = PhysicalGameStatePanel.newVisualizer(gs,640,640,false,PhysicalGameStatePanel.COLORSCHEME_BLACK);
 //        JFrame w = PhysicalGameStatePanel.newVisualizer(gs,640,640,false,PhysicalGameStatePanel.COLORSCHEME_WHITE);
@@ -63,5 +64,18 @@ public class GameVisualSimulationTest {
         ai2.gameOver(gs.winner());
         
         System.out.println("Game Over");
-    }    
+    }
+
+    public static AI getBotFromArg(String[] args, UnitTypeTable utt) {
+        if (args.length == 2) switch (args[1].toLowerCase()) {
+            case "mayari": return new mayari(utt);
+            case "mayaripp": return new mayaripp(utt);
+            case "workerrush": return new WorkerRush(utt, new BFSPathFinding());
+            case "randombiased": return new RandomBiasedAI();
+            //case "workerrush": return new WorkerRush(utt, new BFSPathFinding());
+            //case "workerrush": return new WorkerRush(utt, new BFSPathFinding());
+        };
+        return new mayari(utt); //Default
+    }
+
 }
