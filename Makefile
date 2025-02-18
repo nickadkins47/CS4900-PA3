@@ -3,13 +3,12 @@
 
 target = bin/microrts.jar
 
-bot_name = mayaripp
-bot_dir = mayaripp
+bot_name = lightari
+bot_dir = lightari
 
-bot_bin = $(bot_dir)/$(bot_dir)
 bot_trg = lib/bots/$(bot_name).jar
-bot_jar = $(bot_bin)/$(bot_name).jar
-bot_cls = $(bot_bin)/$(bot_name)*.class
+bot_jar = $(bot_dir)/$(bot_name).jar
+bot_cls = $(bot_dir)/$(bot_name)*.class
 bot_src = $(bot_dir)/$(bot_name).java
 
 .PHONY: default
@@ -20,13 +19,29 @@ default: rs
 
 .PHONY: rf run_full rs run_single
 
-rf run_full: $(target) # Run MicroRTS
+ARG = 
+
+rf run_full: $(target) # Full Game
 	@echo "Running Full Game ..."
 	@cd bin && java -cp microrts.jar rts.MicroRTS
 
-rs run_single: bin
+rs run_single: $(target) $(bot_trg) # Single Round
 	@echo "Running Round ..."
-	@java -cp "bin/*:lib/*" mayaripp/test_run.java
+	@java -cp "bin/*" $(bot_dir)/test_run.java $(ARG)
+
+rsn run_single_norecomp: # Single Round; Dont Recompile anything
+	@echo "Running Round ..."
+	@java -cp "bin/*" $(bot_dir)/test_run.java $(ARG)
+
+#################################################################
+# Tournament Results
+
+results: lightari/results/avgs.out
+	@./results.sh
+	@cd lightari/results && ./avgs.out
+
+lightari/results/avgs.out: lightari/results/avgs.cc
+	@g++ -Wall $< -o $@
 
 #################################################################
 # Compile Game
@@ -40,25 +55,31 @@ comp $(target): bin
 
 # 1: compile source files
 # 2: extract the contents of the JAR dependencies
-bin: lib src | $(bot_trg)
+bin: lib src
 	@echo "Compiling ./src ..."
-	@javac -cp "lib/*:src" -d bin $(shell find . -name "*.java")
+	@javac -cp "lib/*:src" -d bin $(shell find src -name "*.java")
 	@echo "Extracting Dependencies from ./lib ..."
 	@cd bin && find ../lib -name "*.jar" | xargs -n 1 jar xf
 
 #################################################################
-# My fork of the Mayari Bot, Mayari++
+# Compile Bot
 
 .PHONY: bot jar
 
-bot $(bot_trg): $(bot_jar)
+bot $(bot_trg): $(bot_jar) | bin/$(bot_dir) 
 	@cp $(bot_jar) $(bot_trg)
+	@cp $(bot_cls) bin/$(bot_dir)
+
+bin/$(bot_dir):
+	@mkdir $@
 
 jar $(bot_jar): $(bot_cls)
+	@echo "Creating bot .jar file ..."
 	@jar cf $(bot_jar) $^
 
 $(bot_cls): $(bot_src)
-	@javac -cp "lib/*:src" -d $(bot_dir) $<
+	@echo "Compiling Bot ..."
+	@javac -cp "lib/*:src" $<
 
 #################################################################
 
@@ -70,4 +91,4 @@ clean_bin:
 	@rm -rf bin
 
 clean_bot:
-	@rm -rf $(bot_trg) $(bot_jar) $(bot_cls)
+	@rm -rf $(bot_trg) $(bot_jar) $(bot_cls) bin/$(bot_dir)

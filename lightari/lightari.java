@@ -3,7 +3,14 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package mayaripp; // Mayari++
+package lightari; 
+
+/*
+Lightari (fork of Mayari)
+1: Lights instead of Mayari's Heavies
+2: Workers attack whenever resources are depleted, instead of standing around
+3: Units (should be) more cautious of attacking enemies
+*/
 
 import ai.abstraction.pathfinding.AStarPathFinding;
 import ai.core.AI;
@@ -35,7 +42,7 @@ import rts.units.UnitTypeTable;
  * 
  * version 2.0
 */
-public class mayaripp extends AIWithComputationBudget {
+public class lightari extends AIWithComputationBudget {
         
     public class Pos {
         int _x;
@@ -71,8 +78,8 @@ public class mayaripp extends AIWithComputationBudget {
     
     int _resourcesUsed;
     List<Pos> _futureBarracks;
-    int _futureHeavies;
-    int _enemyFutureHeavy;
+    int _futureLights;
+    int _enemyFutureLights;
     
     List<Unit> _resources;
     
@@ -100,7 +107,6 @@ public class mayaripp extends AIWithComputationBudget {
     public void restartPathFind() {
         _astarPath = new AStarPathFinding();
     }
-    
     
     boolean isBlocked(Unit u, Pos p) {
         if (outOfBound(p) || _pgs.getTerrain(p.getX(), p.getY()) != PhysicalGameState.TERRAIN_NONE)
@@ -186,7 +192,7 @@ public class mayaripp extends AIWithComputationBudget {
         return astarMove;
     }
 
-    public mayaripp(UnitTypeTable utt) {
+    public lightari(UnitTypeTable utt) {
         super(-1, -1);
         _utt = utt;
         restartPathFind(); //FloodFillPathFinding(); //AStarPathFinding();
@@ -205,7 +211,7 @@ public class mayaripp extends AIWithComputationBudget {
     }
     @Override
     public AI clone() {
-        return new mayaripp(_utt);
+        return new lightari(_utt);
     }
     @Override
     public List<ParameterSpecification> getParameters() {
@@ -510,8 +516,8 @@ public class mayaripp extends AIWithComputationBudget {
         lockPos(u.getX(), u.getY(), ua.getDirection());
         if (bType == _utt.getUnitType("Barracks"))
             _futureBarracks.add(futurePos(u.getX(), u.getY(), ua.getDirection()));
-        else if (bType == _utt.getUnitType("Heavy"))
-            _futureHeavies += 1;
+        else if (bType == _utt.getUnitType("Light"))
+            _futureLights += 1;
         _resourcesUsed += bType.cost;
         return true;
     }
@@ -557,7 +563,7 @@ public class mayaripp extends AIWithComputationBudget {
         int ePower = 0;
         for (Unit u : _enemiesCombat)
             ePower += u.getMaxDamage();
-        return (power - (int) 1.2*ePower) > 0;
+        return (power - (int) 1.5*ePower) > 0;
     }
     
     int combatScore(Unit u, Unit e) {
@@ -567,7 +573,7 @@ public class mayaripp extends AIWithComputationBudget {
                 && e.getType() == _utt.getUnitType("Ranged") && _pgs.getWidth() > 9)
             score += 2; //todo may be change that and add logic below
         
-        if (_pgs.getWidth() >= 16 && (u.getType() == _utt.getUnitType("Heavy") || u.getType() == _utt.getUnitType("Ranged"))
+        if (_pgs.getWidth() >= 16 && (u.getType() == _utt.getUnitType("Light") || u.getType() == _utt.getUnitType("Ranged"))
                && (e.getType() == _utt.getUnitType("Barracks"))) //todo - remove? todo base
             score += _pgs.getWidth();
         
@@ -610,15 +616,22 @@ public class mayaripp extends AIWithComputationBudget {
             Unit enemy = candidates.get(0);
             if (overPowering()) //give worker to open pathway if blocked
                 tryMoveAway(u, u);
-            moveInDirection(u, enemy);
+
+            if (distance(u, closest(u, _allyUnits)) > 3) {
+                tryMoveAway(u, enemy); //Lightari: Units should be more cautious of going to combat
+            } else {
+                moveInDirection(u, enemy);
+            }
         }
     }
     
     boolean shouldWorkersAttack() {
+        if (_resources.size() == 0)
+            return true; //LIGHTARI: If workers have nothing else to do, then attack
         if (_pgs.getWidth() <= 12)
             return true;
-        if (enemyHeaviesWeak() && _enemyArchers.isEmpty() &&
-                 _heavies.isEmpty() && _futureHeavies == 0 && _archers.isEmpty())
+        if (enemyLightsWeak() && _enemyArchers.isEmpty() &&
+                 _lights.isEmpty() && _futureLights == 0 && _archers.isEmpty())
             return true;
         return false; //todo here
     }
@@ -647,7 +660,7 @@ public class mayaripp extends AIWithComputationBudget {
         return true;
     }
     
-    int harvesterPerBase() {
+    /*int harvesterPerBase() {
         int totalWorkers = _workers.size() + _enemyWorkers.size();
         int totalCombat = _allyCombat.size() + _enemiesCombat.size();
         int totalResource = _resources.size();
@@ -659,7 +672,7 @@ public class mayaripp extends AIWithComputationBudget {
         if(_pgs.getWidth() <= 12 && totalOcc > (int) (area / 2.9))
             return 1; //be more aggresive
         return 2;
-    }
+    }*/
     
     void workerAction() {
         List<Unit> ws = new ArrayList<>(_workers);
@@ -667,7 +680,7 @@ public class mayaripp extends AIWithComputationBudget {
         
         HashMap<Unit, Integer> baseHarCount = new HashMap<>();
         
-        int perBase = harvesterPerBase();
+        int perBase = 2; //harvesterPerBase();
         
         for (Long harId : _memHarvesters) {
             Unit h = _pgs.getUnit(harId);
@@ -805,14 +818,14 @@ public class mayaripp extends AIWithComputationBudget {
         }
         return false;
     }
-    boolean enemyHeaviesWeak() {
-        if (_enemyFutureHeavy > 0)
+    boolean enemyLightsWeak() {
+        if (_enemyFutureLights > 0)
             return false;
-        if (_enemyHeavies.size() > 1)
+        if (_enemyLights.size() > 1)
             return false;
 
-        if (_enemyHeavies.size() == 1) {
-            if(_enemyHeavies.get(0).getHitPoints() > 3) //rangers get 3 shoots at heavy
+        if (_enemyLights.size() == 1) {
+            if (_enemyLights.get(0).getHitPoints() > 3)
                 return false;
         }
         
@@ -822,15 +835,15 @@ public class mayaripp extends AIWithComputationBudget {
             int baseDist = minDistance(uPos, toPos(_enemyBases));
             int resDist =  u.getResources() > 0 ? 0 : minDistance(uPos, toPos(_resources));
             
-            //todo - here what matters is how close are we to attack relative to future heavies
+            //todo - here what matters is how close are we to attack relative to future lights
             totEnemyRes += (baseDist + resDist) < _pgs.getWidth()/2 ? 1 : 0;
         }
-        if (totEnemyRes >= _utt.getUnitType("Heavy").cost)
+        if (totEnemyRes >= _utt.getUnitType("Light").cost)
             return false;
         return true;
     }
     void barracksAction() {
-        int totalHeavies = _heavies.size() + _futureHeavies;
+        int totalLights = _lights.size() + _futureLights;
         for (Unit barrack : _barracks) {
             if (busy(barrack))
                 continue;
@@ -840,14 +853,14 @@ public class mayaripp extends AIWithComputationBudget {
                     continue;
             }
             
-            if(produceCombat(barrack, _utt.getUnitType("Heavy")))
+            if(produceCombat(barrack, _utt.getUnitType("Light")))
                 continue;
             
-            if(enemyHeaviesWeak()) //not enough resource for heavy
+            if(enemyLightsWeak()) //not enough resource for light
                 if(produceCombat(barrack, _utt.getUnitType("Ranged")))
                     continue;
             
-            if (_resources.isEmpty() && _p.getResources() - _resourcesUsed < _utt.getUnitType("Heavy").cost)
+            if (_resources.isEmpty() && _p.getResources() - _resourcesUsed < _utt.getUnitType("Light").cost)
                 produceCombat(barrack, _utt.getUnitType("Ranged"));
         }
     }
@@ -901,8 +914,8 @@ public class mayaripp extends AIWithComputationBudget {
         if (busy(w))
             return Integer.MIN_VALUE;
         int barrackTLen = _utt.getUnitType("Barracks").produceTime /  _utt.getUnitType("Worker").moveTime;
-        int heavyTLen = _utt.getUnitType("Heavy").produceTime  /  _utt.getUnitType("Worker").moveTime;
-        int dangerTLen = barrackTLen + heavyTLen;
+        int lightTLen = _utt.getUnitType("Light").produceTime  /  _utt.getUnitType("Worker").moveTime;
+        int dangerTLen = barrackTLen + lightTLen;
         Unit e = closest(dst, _enemies);
         int edist = Math.max(distance(dst, toPos(e)), 1);
         int dangerPenalty = 0;
@@ -964,7 +977,8 @@ public class mayaripp extends AIWithComputationBudget {
         return produce(worker, dir,  _utt.getUnitType("Barracks"));
     }
     boolean needNewBarracks() {
-        if (_barracks.size() + _futureBarracks.size() >= _bases.size()) //todo
+        return _barracks.size() < 2;
+        /*if (_barracks.size() + _futureBarracks.size() >= _bases.size()) //todo
             return false;
         
         int maxDist = _pgs.getWidth() / 4;
@@ -977,20 +991,13 @@ public class mayaripp extends AIWithComputationBudget {
                 continue;
             return true;
         }
-        return false;
+        return false;*/
     }
     void buildBracks() {
-        if (_p.getResources() - _resourcesUsed  - 1 < _utt.getUnitType("Barracks").cost)
-            return;
-        
-        if (!needNewBarracks())
-            return;
-        
-        if(_bases.isEmpty()) //todo
-            return;
-        
-        if (_workers.isEmpty())
-            return;
+        if (_p.getResources() - _resourcesUsed -1 < _utt.getUnitType("Barracks").cost) return;
+        if (!needNewBarracks()) return;
+        if(_bases.isEmpty()) return;
+        if (_workers.isEmpty()) return;
         
         List<Pos> pCandidates = new ArrayList<>();
         for (Unit base : _bases) {
@@ -1023,8 +1030,8 @@ public class mayaripp extends AIWithComputationBudget {
         
         //int rangerBasePenalty = 0;
         //if (attacker.getType() == _utt.getUnitType("Ranger")
-         //       && attacker.getType() == _utt.getUnitType("Base")) 
-         //   rangerBasePenalty = 1;
+        //        && attacker.getType() == _utt.getUnitType("Base")) 
+        //    rangerBasePenalty = 1;
         
         boolean inRange = inAttackRange(attacker, defender);
         int attackSucc = inRange && !willEscapeAttack(attacker, defender) ? 1 : 0;
@@ -1179,8 +1186,8 @@ public class mayaripp extends AIWithComputationBudget {
         }
         
         _futureBarracks = new ArrayList<>();
-        _futureHeavies = 0;
-        _enemyFutureHeavy = 0;
+        _futureLights = 0;
+        _enemyFutureLights = 0;
         for (Unit u : _all) { //todo big change that was ally by mistake
             UnitActionAssignment aa = _gs.getActionAssignment(u);
             if(aa == null)
@@ -1199,11 +1206,11 @@ public class mayaripp extends AIWithComputationBudget {
                  Pos p = futurePos(u.getX(), u.getY(), aa.action.getDirection()); //todo this was aa.action.x which was 0 big change
                  _futureBarracks.add(p);
              }
-             if (!isEnemyUnit(u) && ut == _utt.getUnitType("Heavy")) {
-                 _futureHeavies += 1;
+             if (!isEnemyUnit(u) && ut == _utt.getUnitType("Light")) {
+                 _futureLights += 1;
              }
-             if(isEnemyUnit(u) && aa.action.getUnitType() == _utt.getUnitType("Heavy"))
-                 _enemyFutureHeavy += 1;
+             if(isEnemyUnit(u) && aa.action.getUnitType() == _utt.getUnitType("Light"))
+                 _enemyFutureLights += 1;
         }
         
         for (Unit u : _all) {
@@ -1265,7 +1272,6 @@ public class mayaripp extends AIWithComputationBudget {
         
         attackNearby(); //fight whoever is near
         
-        
         buildBracks();
         buildBase();
         barracksAction();
@@ -1278,13 +1284,11 @@ public class mayaripp extends AIWithComputationBudget {
         else
             freeBlocks(_workers);
         
-        goCombat(_heavies, 30);
+        goCombat(_lights, 30);
         goCombat(_archers, 15);
-        goCombat(_lights, 5);
+        //goCombat(_lights, 5);
         
         //if (_pgs.getWidth() >= 9)
-            
-        
         
         _pa.fillWithNones(gs, player, 1);
         return _pa;

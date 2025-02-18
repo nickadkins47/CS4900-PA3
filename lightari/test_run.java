@@ -15,9 +15,13 @@ import rts.PhysicalGameState;
 import rts.PlayerAction;
 import rts.units.UnitTypeTable;
 
+import ai.coac.CoacAI;
+import ai.competition.rojobot.Rojo;
+import ai.competition.IzanagiBot.Izanagi;
+import ai.JZ.MixedBot;
+import ai.competition.tiamat.Tiamat;
 import mayariBot.mayari;
-import mayaripp.mayaripp; //My Bot
-
+import lightari.lightari; //My Bot
 
  /**
  *
@@ -34,7 +38,7 @@ class GameVisualSimulationTest {
         int PERIOD = 20;
         boolean gameover = false;
         
-        AI ai1 = new mayaripp(utt);
+        AI ai1 = new lightari(utt);
         AI ai2 = getBotFromArg(args, utt);
 
         JFrame w = PhysicalGameStatePanel.newVisualizer(gs,640,640,false,PhysicalGameStatePanel.COLORSCHEME_BLACK);
@@ -67,14 +71,21 @@ class GameVisualSimulationTest {
     }
 
     public static AI getBotFromArg(String[] args, UnitTypeTable utt) {
-        if (args.length == 2) switch (args[1].toLowerCase()) {
-            case "mayari": return new mayari(utt);
-            case "mayaripp": return new mayaripp(utt);
-            case "workerrush": return new WorkerRush(utt, new BFSPathFinding());
-            case "randombiased": return new RandomBiasedAI();
-            //case "workerrush": return new WorkerRush(utt, new BFSPathFinding());
-            //case "workerrush": return new WorkerRush(utt, new BFSPathFinding());
-        };
+        if (args.length == 1) { 
+            System.out.printf("=== Lightari vs %s ===", args[0]);
+            switch (args[0].toLowerCase()) {
+                case "mayari": return new mayari(utt);
+                case "lightari": return new lightari(utt);
+                case "workerrush": return new WorkerRush(utt, new BFSPathFinding());
+                case "randombiased": return new RandomBiasedAI();
+                case "coacai": return new CoacAI(utt);
+                case "rojo": return new Rojo(utt);
+                case "izanagi": return new Izanagi(utt);
+                case "mixedbot": return new MixedBot(utt);
+                case "tiamat": return new Tiamat(utt);
+                default: System.out.print("Error: Invalid Bot Name. Defaulting to Mayari");
+            };
+        }
         return new mayari(utt); //Default
     }
 
