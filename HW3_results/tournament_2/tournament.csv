@@ -1,0 +1,57 @@
+tournaments.RoundRobinTournament
+AIs
+	mayari
+	lightari
+maps
+	/home/nickadkins47/CS4900/CS4900-PA3/maps/bases8x8.xml
+iterations	10
+maxGameLength	3000
+timeBudget	100
+iterationsBudget	-1
+pregameAnalysisBudget	1000	1000
+preAnalysis	true
+fullObservability	true
+timeoutCheck	true
+runGC	false
+iteration	map	ai1	ai2	time	winner	crashed	timedout
+0	0	0	1	755	1	-1	-1
+0	0	1	0	758	1	-1	-1
+1	0	0	1	755	1	-1	-1
+1	0	1	0	758	1	-1	-1
+2	0	0	1	755	1	-1	-1
+2	0	1	0	758	1	-1	-1
+3	0	0	1	755	1	-1	-1
+3	0	1	0	755	1	-1	-1
+4	0	0	1	755	1	-1	-1
+4	0	1	0	758	1	-1	-1
+5	0	0	1	755	1	-1	-1
+5	0	1	0	755	1	-1	-1
+6	0	0	1	755	1	-1	-1
+6	0	1	0	758	1	-1	-1
+7	0	0	1	755	1	-1	-1
+7	0	1	0	755	1	-1	-1
+8	0	0	1	755	1	-1	-1
+8	0	1	0	755	1	-1	-1
+9	0	0	1	755	1	-1	-1
+9	0	1	0	755	1	-1	-1
+Wins:
+0	0	
+0	0	
+Ties:
+0	0	
+0	0	
+Average Game Length:
+0.0	755.0	
+756.5	0.0	
+AI crashes:
+0	0	
+0	0	
+opponent AI crashes:
+0	0	
+0	0	
+AI timeout:
+0	0	
+0	0	
+opponent AI timeout:
+0	0	
+0	0	
