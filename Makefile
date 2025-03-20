@@ -21,7 +21,7 @@ default: rs
 
 ARG = 
 
-rf run_full: $(target) # Full Game
+rf run_full: $(target) $(bot_trg) # Full Game
 	@echo "Running Full Game ..."
 	@cd bin && java -cp microrts.jar rts.MicroRTS
 
@@ -36,11 +36,17 @@ rsn run_single_norecomp: # Single Round; Dont Recompile anything
 #################################################################
 # Tournament Results
 
-results: lightari/results/avgs.out
-	@./results.sh
-	@cd lightari/results && ./avgs.out
+.PHONY: results
 
-lightari/results/avgs.out: lightari/results/avgs.cc
+res_dir = $(bot_dir)/results
+res_src = $(res_dir)/avgs.cc
+res_out = $(res_dir)/avgs.out
+
+results: $(res_out)
+	@./$(res_dir)/results.sh
+	@cd $(res_dir) && ./avgs.out
+
+$(res_out): $(res_src)
 	@g++ -Wall $< -o $@
 
 #################################################################
@@ -85,7 +91,10 @@ $(bot_cls): $(bot_src)
 
 .PHONY: clean clean_bin clean_bot
 
-clean: clean_bin clean_bot
+clean: clean_results clean_bin clean_bot
+
+clean_results:
+	@rm -rf $(res_dir)/tnmt_*.txt $(res_dir)/avgs.out
 
 clean_bin:
 	@rm -rf bin

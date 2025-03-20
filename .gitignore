@@ -6,7 +6,7 @@ microrts.jar
 /.project
 /.idea
 /.vscode
-lib/bots/lightari.jar
+
 lightari/*.jar
 lightari/results/*.out
 lightari/results/*.txt

@@ -11,8 +11,8 @@
 using namespace std;
 
 int main(int argc, char const *argv[]) {
-    for (int i = 2; i <= 5; i++) { 
-        int j = 0;
+    const int a = 3;
+    for (int i = a; i <= a; i++) {
         string fileName = string("tnmt_") + to_string(i) + string(".txt");
         ifstream inFile(fileName);
         string line;

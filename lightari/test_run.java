@@ -10,6 +10,8 @@ import ai.abstraction.pathfinding.BFSPathFinding;
 import gui.PhysicalGameStatePanel;
 
 import javax.swing.JFrame;
+
+import agentP.AgentP;
 import rts.GameState;
 import rts.PhysicalGameState;
 import rts.PlayerAction;
@@ -83,6 +85,7 @@ class GameVisualSimulationTest {
                 case "izanagi": return new Izanagi(utt);
                 case "mixedbot": return new MixedBot(utt);
                 case "tiamat": return new Tiamat(utt);
+                case "agentp": return new AgentP(utt);
                 default: System.out.print("Error: Invalid Bot Name. Defaulting to Mayari");
             };
         }
