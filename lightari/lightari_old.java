@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package lightari; 
+package lightari_old; 
 
 /*
 Lightari (fork of Mayari)
@@ -12,6 +12,10 @@ Lightari (fork of Mayari)
 3: Units (should be) more cautious of attacking enemies
 */
 
+import ai.abstraction.pathfinding.AStarPathFinding;
+import ai.core.AI;
+import ai.core.AIWithComputationBudget;
+import ai.core.ParameterSpecification;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -19,12 +23,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.stream.Collectors;
-
-import ai.abstraction.pathfinding.AStarPathFinding;
-import ai.core.AI;
-import ai.core.AIWithComputationBudget;
-import ai.core.ParameterSpecification;
 import rts.GameState;
 import rts.PhysicalGameState;
 import static rts.PhysicalGameState.TERRAIN_WALL;
@@ -44,7 +42,7 @@ import rts.units.UnitTypeTable;
  * 
  * version 2.0
 */
-public class lightari extends AIWithComputationBudget {
+public class lightari_old extends AIWithComputationBudget {
         
     public class Pos {
         int _x;
@@ -122,7 +120,8 @@ public class lightari extends AIWithComputationBudget {
             return true;
         if (!isEnemyUnit(pu))
             return true;
-        if (u.getType() == _utt.getUnitType("Worker") && pu.getType() != _utt.getUnitType("Worker"))
+        if (u.getType() == _utt.getUnitType("Worker") 
+                && pu.getType() != _utt.getUnitType("Worker"))
             return true;
         return false;
     }
@@ -165,7 +164,7 @@ public class lightari extends AIWithComputationBudget {
             Unit pu = _pgs.getUnitAt(p.getX(), p.getY());
             if (pu != null)
                 continue;
-            int fit = -1000 * proximity[p.getX()][p.getY()] - (int)euclDist(p, dst);
+            int fit = -1000*proximity[p.getX()][p.getY()] - (int)squareDist(p, dst);
             if (fit > bestFit) {
                 bestFit = fit;
                 bestPos = p;
@@ -193,7 +192,7 @@ public class lightari extends AIWithComputationBudget {
         return astarMove;
     }
 
-    public lightari(UnitTypeTable utt) {
+    public lightari_old(UnitTypeTable utt) {
         super(-1, -1);
         _utt = utt;
         restartPathFind(); //FloodFillPathFinding(); //AStarPathFinding();
@@ -214,7 +213,7 @@ public class lightari extends AIWithComputationBudget {
     
     @Override
     public AI clone() {
-        return new lightari(_utt);
+        return new lightari_old(_utt);
     }
     
     @Override
@@ -236,7 +235,11 @@ public class lightari extends AIWithComputationBudget {
             int x = pos % _pgs.getWidth();
             int y = pos / _pgs.getWidth();
             Unit u = new Unit(0, _utt.getUnitType("Worker"), x, y);
-            UnitAction a = new UnitAction(UnitAction.TYPE_MOVE, NoDirection);
+            UnitAction a = null;
+            if (x > 0)
+                a = new UnitAction(UnitAction.TYPE_MOVE, NoDirection); //this is a hack
+            else
+                a = new UnitAction(UnitAction.TYPE_MOVE, NoDirection);
             UnitActionAssignment uaa = new UnitActionAssignment(u, a, 0);
             ru.merge(uaa.action.resourceUsage(u, _pgs));
         }
@@ -244,8 +247,10 @@ public class lightari extends AIWithComputationBudget {
     }
 
     boolean outOfBound(Pos p) {
-        return (p.getX() < 0 || p.getY() < 0
-            || p.getX() >= _pgs.getWidth() || p.getY() >= _pgs.getHeight());
+        if(p.getX() < 0 || p.getY() < 0 || p.getX() >= _pgs.getWidth()
+                || p.getY() >= _pgs.getHeight())
+            return true;
+        return false;
     }
 
     boolean posFree(int x, int y, int dir) {
@@ -270,15 +275,20 @@ public class lightari extends AIWithComputationBudget {
         int nx = x;
         int ny = y;
         switch (dir) {
-            case UnitAction.DIRECTION_DOWN ->
+            case UnitAction.DIRECTION_DOWN:
                 ny = (ny == _pgs.getHeight()- 1) ? ny : ny + 1;
-            case UnitAction.DIRECTION_UP ->
+                break;
+            case UnitAction.DIRECTION_UP:
                 ny = (ny == 0) ? ny : ny - 1;
-            case UnitAction.DIRECTION_RIGHT ->
+                break;
+            case UnitAction.DIRECTION_RIGHT:
                 nx = (nx == _pgs.getWidth() - 1) ? nx : nx + 1;
-            case UnitAction.DIRECTION_LEFT ->
+                break;
+            case UnitAction.DIRECTION_LEFT:
                 nx = (nx == 0) ? nx : nx - 1;
-            default -> {}
+                break;
+            default:
+                break;
         }
         return new Pos(nx, ny);
     }
@@ -294,7 +304,6 @@ public class lightari extends AIWithComputationBudget {
     }
     
     Pos toPos(Unit u) {
-        if (u == null) return new Pos(0,0);
         return new Pos(u.getX(), u.getY());
     }
     
@@ -318,6 +327,10 @@ public class lightari extends AIWithComputationBudget {
         return aa != null;
     }
     
+    boolean dying(Unit u) {
+        return u.getHitPoints() <= _newDmgs.getOrDefault(u, 0);
+    }
+    
     boolean willEscapeAttack(Unit attacker, Unit runner) {
         UnitActionAssignment aa = _gs.getActionAssignment(runner);
         if (aa == null)
@@ -328,51 +341,47 @@ public class lightari extends AIWithComputationBudget {
         return eta <= attacker.getAttackTime();
     }
     
+    boolean soonInAttackRange(Unit attacker, Unit runner) {
+        return squareDist(toPos(attacker), futurePos(runner)) <= attacker.getAttackRange();
+    }
+    
     boolean inAttackRange(Unit attacker, Unit runner) {
-        return !willEscapeAttack(attacker, runner)
-            && euclDist(attacker, runner) <= attacker.getAttackRange();
+        return squareDist(toPos(attacker), toPos(runner)) <= attacker.getAttackRange();
     }
     
     List<Pos> toPos(List<Unit> units) {
-        return units.stream()
-            .map(u -> toPos(u))
-            .collect(Collectors.toList());
-    }
-
-    Unit closestUnit(Pos src, List<Unit> units) {
-        if (units.isEmpty()) return null;
-        return units.stream()
-            .filter(u -> distance(src, u) != 0) //filters out unit at pos (src)
-            .min(Comparator.comparing(u -> distance(src, u)))
-            .orElse(units.get(0));
+        List<Pos> poses = new ArrayList<>();
+        for (Unit u : units) {
+            poses.add(toPos(u));
+        }
+        return poses;
     }
     
-    Unit closestUnit(Unit src, List<Unit> units) {
-        return closestUnit(toPos(src), units);
+    Unit closest(Pos src, List<Unit> units) {
+        if (units.isEmpty())
+            return null;
+        Unit closest = units.stream().min(Comparator.comparing(u -> distance(src, toPos(u)))).get();
+        return closest;
     }
-
-    Pos closestPos(Pos src, List<Pos> poses) {
-        if (poses.isEmpty()) return null;
-        return poses.stream()
-            .filter(u -> distance(src, u) != 0) //filters out pos at given pos (src)
-            .min(Comparator.comparing(u -> distance(src, u)))
-            .orElse(poses.get(0));
+    
+    Unit closest(Unit src, List<Unit> units) {
+        return closest(toPos(src), units);
     }
-
-    int minDistance(Unit src, List<Unit> units) {
-        return distance(src, closestUnit(src, units));
+    
+    int minDistance(Pos p, List<Pos> poses) {
+        int minDist = Integer.MAX_VALUE;
+        for (Pos u : poses) {
+            minDist = minDist < distance(p, u) ? minDist : distance(p, u);
+        }
+        return minDist;
     }
-
-    int minDistance(Pos src, List<Pos> poses) {
-        return distance(src, closestPos(src, poses));
-    }
-
+    
     boolean isSeperated(Unit base, List<Unit> units) {
         for (Unit u : units) {
             int rasterPos = u.getX() + u.getY() * _pgs.getWidth();
             ResourceUsage rsu = fullResourceUse();//(_pgs.getHeight() == 8) ? _gs.getResourceUsage() :  //todo - remove this
             if (_astarPath.findPathToAdjacentPosition(base, rasterPos, _gs, rsu) != null)
-                return false;
+                    return false;
         }
         return true;
     }
@@ -393,23 +402,11 @@ public class lightari extends AIWithComputationBudget {
     int distance(Unit a, Pos b) {
         return distance(toPos(a), b);
     }
-
-    int distance(Pos a, Unit b) {
-        return distance(a, toPos(b));
-    }
     
-    double euclDist(Pos p, Pos u) {
+    double squareDist(Pos p, Pos u) {
         int dx = p.getX() - u.getX();
         int dy = p.getY() - u.getY();
         return Math.sqrt(dx * dx + dy * dy);        
-    }
-
-    double euclDist(Unit a, Unit b) {
-        return euclDist(toPos(a), toPos(b));        
-    }
-
-    double euclDist(Unit a, Pos b) {
-        return euclDist(toPos(a), b);        
     }
 
     List<Pos> allPosDist(Pos src, int dist) {
@@ -437,6 +434,7 @@ public class lightari extends AIWithComputationBudget {
         UnitAction ua = new UnitAction(UnitAction.TYPE_ATTACK_LOCATION, e.getX(), e.getY());
         if (!_gs.isUnitActionAllowed(a, ua))
             return false;
+        
         _pa.addUnitAction(a, ua);
         if (!_newDmgs.containsKey(e))
             _newDmgs.put(e, 0);
@@ -466,10 +464,33 @@ public class lightari extends AIWithComputationBudget {
         return true;
     }
     
+    /* boolean safeMoveTowards(Unit a, Unit e) {
+        int pos = e.getX() + e.getY() * _pgs.getWidth();
+        UnitAction move = findPathAdjacent(a, pos);
+        if(move == null)
+            return false;
+        Pos futurePos = futurePos(a.getX(), a.getY(), move.getDirection());
+        int fPos = futurePos.getX() + futurePos.getY() * _pgs.getWidth();
+        if(!posFree(futurePos.getX(), futurePos.getY(), NoDirection))
+            return false;
+        
+        for (Unit enemy : _enemies) {
+            if (!enemy.getType().canAttack)
+                continue;
+            int futureDist = distance(futurePos, futurePos(enemy));
+            if(futureDist <= enemy.getAttackRange())
+                return false;
+        }
+        
+        _pa.addUnitAction(a, move);
+        _locationsTaken.add(fPos);
+        return true;
+    } */
+    
     boolean tryMoveAway(Unit a, Unit b) {
         int startDist = distance(toPos(a), toPos(b));
-        List<Integer> dirsRand = new ArrayList<>(_dirs);
-        Collections.shuffle(dirsRand);
+        List<Integer> dirsRand = new ArrayList<>( _dirs ) ;
+        Collections.shuffle(dirsRand) ;
 
         for (int dir : dirsRand) {
             Pos newPos = futurePos(a.getX(), a.getY(), dir);
@@ -487,7 +508,7 @@ public class lightari extends AIWithComputationBudget {
         return false;
     }
     
-    /* boolean moveInDirection(Unit a, Unit b) {
+    boolean moveInDirection(Unit a, Unit b) {
         int startDist = distance(toPos(a), toPos(b));
         List<Integer> dirsRand = new ArrayList<>( _dirs );
         Collections.shuffle(dirsRand);
@@ -505,14 +526,15 @@ public class lightari extends AIWithComputationBudget {
             }
         }
         return false;
-    } */
+    }
+    
     
     boolean produce(Unit u, int dir, UnitType bType) {
         if (busy(u))
             return false;
-        if (_p.getResources() - _resourcesUsed < bType.cost)
+        if(_p.getResources() - _resourcesUsed < bType.cost)
             return false;
-        if (!posFree(u.getX(), u.getY(), dir))
+        if(!posFree(u.getX(), u.getY(), dir))
             return false;
         UnitAction ua = new UnitAction(UnitAction.TYPE_PRODUCE, dir, bType);
         if (!_gs.isUnitActionAllowed(u, ua))
@@ -597,60 +619,44 @@ public class lightari extends AIWithComputationBudget {
         }
         return scores;
     }
-
-    boolean combatUnitMove(Unit u, Unit e) {
-        if (inAttackRange(u, e) && !willEscapeAttack(u, e)) { //If unit can attack right now
-            if (attackNow(u, e)) { //Then attack
-                //printDebug("Attack");
-                return true;
-            }
-        }
-        //Else unit cant attack
-        if (minDistance(u, _enemiesCombat) <= 5) { //If enemy is close
-            if (moveTowards(u, toPos(closestUnit(u, _enemiesCombat)))) { //Then move into attacking range
-                //printDebug("Defend");
-                return true;
-            }
-        }
-        //Else no Enemy is close
-        if (minDistance(u, _allyCombat) <= 2) { //If another ally is close
-            if (moveTowards(u, futurePos(e))) { //Then Unit is not alone, so move forwards
-                //printDebug("Forwards");
-                return true;
-            }
-        }
-        //Else Unit will regroup with nearest ally
-        if (moveTowards(u, toPos(closestUnit(u, _allyCombat)))) {
-            //printDebug("Regroup");
-            return true;
-        }
-
-        //If that fails somehow then just dont do anything
-        //printDebug("NOP");
-        return doNothing(u);
-    }
     
-    void moveCombatUnits(List<Unit> units, int timeToSave) {
-        for (Unit u : units) {
-            if (busy(u) || !u.getType().canAttack) continue;
+    void goCombat(List<Unit> units, int timeToSave) {
+        for(Unit u : units) {
+            if (busy(u) || !u.getType().canAttack)
+                continue;
             
             List<Unit> candidates = new ArrayList(_enemies);
             List<Unit> candidatesCopy = new ArrayList(candidates);
             int[] scores = getCombatScores(u, candidates);
             Collections.sort(candidates, Comparator.comparing(e -> -scores[candidatesCopy.indexOf(e)])); //- for ascending order
+            int counter = 0;
             int cutOff = _enemiesCombat.size() > 24 ? 12 : 24; //for performance
             long timeRemain = timeRemaining(true);
             
-            for (int counter = 0; counter < candidates.size(); counter++) {
-                if (counter > cutOff || timeRemain < timeToSave) break;
+            while (counter < candidates.size() && counter < cutOff && timeRemain > timeToSave) {
                 Unit enemy = candidates.get(counter);
-                if (combatUnitMove(u, enemy)) break;
+                if (moveTowards(u, futurePos(enemy)))
+                    break;
+                counter++;
+            }
+            if (counter < candidates.size()) //if (!candidates.isEmpty()) //did we make a move
+                continue;
+            if (u.getType() != _utt.getUnitType("Ranged"))
+                continue;
+            Unit enemy = candidates.get(0);
+            if (overPowering()) //give worker to open pathway if blocked
+                tryMoveAway(u, u);
+
+            if (distance(u, closest(u, _allyUnits)) > 3) {
+                tryMoveAway(u, enemy); //Lightari: Units should be more cautious of going to combat
+            } else {
+                moveInDirection(u, enemy);
             }
         }
     }
     
     boolean shouldWorkersAttack() {
-        if (_resources.isEmpty())
+        if (_resources.size() == 0)
             return true; //LIGHTARI: If workers have nothing else to do, then attack
         if (_pgs.getWidth() <= 12)
             return true;
@@ -663,15 +669,15 @@ public class lightari extends AIWithComputationBudget {
     int harvestScore(Unit worker, List<Unit> basesRemain) {
         if (busy(worker) || worker.getResources() > 0)
             return Integer.MAX_VALUE;
-        Unit closestResource = closestUnit(worker, _resources);
-        Unit closestBase = closestUnit(worker, basesRemain);
+        Unit closestResource = closest(worker, _resources);
+        Unit closestBase = closest(worker, basesRemain);
         if (closestResource == null || closestBase == null)
             return Integer.MAX_VALUE;
         return distance(toPos(worker), toPos(closestBase)) + distance(toPos(worker), toPos(closestResource));
     }
     
     boolean goHarvesting(Unit worker) {
-        Unit closestRes = closestUnit(worker, _resources);
+        Unit closestRes = closest(worker, _resources);
         if (closestRes == null)
             return false;
         int dist = distance(toPos(worker), toPos(closestRes));
@@ -709,7 +715,7 @@ public class lightari extends AIWithComputationBudget {
         
         for (Long harId : _memHarvesters) {
             Unit h = _pgs.getUnit(harId);
-            Unit b = closestUnit(h, bs);
+            Unit b = closest(h, bs);
             if (!busy(h) && h.getResources() == 0)
                 goHarvesting(h);
             ws.remove(h);
@@ -730,7 +736,7 @@ public class lightari extends AIWithComputationBudget {
             Unit w = ws.stream().min(Comparator.comparingInt((e) -> harvestScore(e, bs))).get();
             if (harvestScore(w, bs) == Integer.MAX_VALUE)
                 break;
-            Unit b = closestUnit(w, bs);
+            Unit b = closest(w, bs);
             goHarvesting(w);
             _memHarvesters.add(w.getID());
             ws.remove(w);
@@ -745,7 +751,7 @@ public class lightari extends AIWithComputationBudget {
                 continue;
             if (worker.getResources() <= 0)
                 continue;
-            Unit base = closestUnit(worker, _bases);
+            Unit base = closest(worker, _bases);
             if (base == null)
                 return;
             else if (distance(worker, base) <= 1)
@@ -768,8 +774,8 @@ public class lightari extends AIWithComputationBudget {
                 continue;
             if (!posFree(n.getX(), n.getY(), dir))
                 continue;
-            Unit e = closestUnit(base, _enemies);
-            Unit r = closestUnit(base, _resources);
+            Unit e = closest(base, _enemies);
+            Unit r = closest(base, _resources);
             if (e == null) //already won?
                     continue;
             //towards enemy, or 
@@ -913,7 +919,7 @@ public class lightari extends AIWithComputationBudget {
             return;
         
         Unit worker = _workers.stream().min(Comparator.comparingInt
-        ((e) -> busy(e) ? Integer.MAX_VALUE : minDistance(e, _resources))).get();
+        ((e) -> busy(e) ? Integer.MAX_VALUE : minDistance(toPos(e), toPos(_resources)))).get();
         
         if(worker == null || busy(worker))
             return;
@@ -944,7 +950,7 @@ public class lightari extends AIWithComputationBudget {
         int barrackTLen = _utt.getUnitType("Barracks").produceTime /  _utt.getUnitType("Worker").moveTime;
         int lightTLen = _utt.getUnitType("Light").produceTime  /  _utt.getUnitType("Worker").moveTime;
         int dangerTLen = barrackTLen + lightTLen;
-        Unit e = closestUnit(dst, _enemies);
+        Unit e = closest(dst, _enemies);
         int edist = Math.max(distance(dst, toPos(e)), 1);
         int dangerPenalty = 0;
         if (edist < dangerTLen) {
@@ -980,7 +986,7 @@ public class lightari extends AIWithComputationBudget {
         if (_workers.isEmpty())
             return Integer.MIN_VALUE;
         
-        Unit b = closestUnit(dst, _bases);
+        Unit b = closest(dst, _bases);
         if (isSeperated(b, _enemies))
             return -(int) buildBlockPenalty(dst, true)*10;
         
@@ -988,7 +994,7 @@ public class lightari extends AIWithComputationBudget {
         allBrxs.addAll(_futureBarracks);
         int deseretScore = 0;
         if (!allBrxs.isEmpty())
-            deseretScore = (int)(minDistance(toPos(b), allBrxs) / 2); //like base to be deserted
+            deseretScore = (int) (minDistance(toPos(b), allBrxs) / 2); //like base to be deserted
         
         double blockingPenalty = buildBlockPenalty(dst, false);
 
@@ -1007,9 +1013,27 @@ public class lightari extends AIWithComputationBudget {
         return produce(worker, dir,  _utt.getUnitType("Barracks"));
     }
 
+    boolean needNewBarracks() {
+        return _barracks.size() < 2;
+        /*if (_barracks.size() + _futureBarracks.size() >= _bases.size()) //todo
+            return false;
+        
+        int maxDist = _pgs.getWidth() / 4;
+        for (Unit b : _bases) {
+            int minDist = minDistance(toPos(b), _futureBarracks);
+            if (minDist <= maxDist)
+                continue;
+            Unit brx = closest(b, _barracks);
+            if (brx != null && distance(toPos(brx), toPos(b)) < maxDist)
+                continue;
+            return true;
+        }
+        return false;*/
+    }
+
     void buildBracks() {
         if (_p.getResources() - _resourcesUsed -1 < _utt.getUnitType("Barracks").cost) return;
-        if (_barracks.size() > 2) return;
+        if (!needNewBarracks()) return;
         if (_bases.isEmpty()) return;
         if (_workers.isEmpty()) return;
         
@@ -1031,6 +1055,71 @@ public class lightari extends AIWithComputationBudget {
                 return;
             pCandidates.remove(c);
             counter += 1;
+        }
+    }
+    
+    int combatNearbyScore(Unit attacker, Unit defender) {
+        if(dying(defender))
+            return Integer.MIN_VALUE;
+        
+        if (squareDist(toPos(attacker), toPos(defender))
+                > (_utt.getUnitType("Ranged").attackRange + 3))
+            return Integer.MIN_VALUE; //tood - remove
+        
+        //int rangerBasePenalty = 0;
+        //if (attacker.getType() == _utt.getUnitType("Ranger")
+        //        && attacker.getType() == _utt.getUnitType("Base")) 
+        //    rangerBasePenalty = 1;
+        
+        boolean inRange = inAttackRange(attacker, defender);
+        int attackSucc = inRange && !willEscapeAttack(attacker, defender) ? 1 : 0;
+        int threatened = inAttackRange(defender, attacker) ? 1 : 0;
+        int willKill = attacker.getMaxDamage() > defender.getHitPoints() ? 1 : 0;
+        
+        int enemyPower = defender.getMaxDamage(); //defender.getMaxHitPoints();
+        
+        int archerToWorker = (attacker.getType() == _utt.getUnitType("Ranged") && //todo big change this was Ranger instead of Ranged
+                defender.getType() == _utt.getUnitType("Worker")) ? 1 : 0;  //to do this was 1: 0 
+        
+        return 1000*attackSucc + 100 * willKill + (archerToWorker + enemyPower) * 10 + threatened;
+    }
+
+    boolean attackNearby(Unit u, Unit e) {
+        boolean inRange = inAttackRange(u, e);
+        boolean attackSucc = inRange && !willEscapeAttack(u, e);
+        if (attackSucc) {
+            return attackNow(u, e);
+        }
+        else if (soonInAttackRange(u, e)) { //wait for attack
+            doNothing(u);
+            return true;
+        }
+        boolean threatened = inAttackRange(e, u);
+        if (threatened) {
+            return moveTowards(u, toPos(e)); //running to rangers... may be shouldnt?
+        }
+        return false;
+    }
+
+    void attackNearby(Unit u) {
+        List<Unit> candidates = new ArrayList<>(_enemies);
+        
+        int cutOff = _enemiesCombat.size() > 24 ? 12 : 24; //for performance issue
+        int counter = 0;
+        while (!candidates.isEmpty() && counter < cutOff) {
+            Unit c = candidates.stream().max(Comparator.comparingInt((e) -> combatNearbyScore(u, e))).get();
+            if (attackNearby(u, c))
+                break;
+            candidates.remove(c);
+            counter++;
+        }
+    }
+
+    void attackNearby() {
+        for (Unit u : _allyUnits) {
+            if (busy(u) || !u.getType().canAttack)
+                continue;
+            attackNearby(u);
         }
     }
     
@@ -1056,10 +1145,6 @@ public class lightari extends AIWithComputationBudget {
         
         return perCycleTime - (_latestTsMilli - _startCycleMilli);
     }
-
-    boolean isUnitOfType (Unit u, String type) { //used in init()
-        return u.getType() == _utt.getUnitType(type);
-    };
     
     void init() {
         _resourcesUsed = 0;
@@ -1095,56 +1180,56 @@ public class lightari extends AIWithComputationBudget {
         _dirs.add(UnitAction.DIRECTION_DOWN);
         _dirs.add(UnitAction.DIRECTION_LEFT);
         _dirs.add(UnitAction.DIRECTION_RIGHT);
-
+    
         for (Unit u : _pgs.getUnits()) {
-            if (u.getType().isResource) {
+            if (u.getType().isResource)
                 _resources.add(u);
-            }
-            else if (isUnitOfType(u,"Base")) {
-                if (isEnemyUnit(u)) {   _enemyBases.add(u);} else {   _bases.add(u);}
-            }
-            else if (isUnitOfType(u,"Barracks")) {
-                if (isEnemyUnit(u)) {_enemyBarracks.add(u);} else {_barracks.add(u);}
-            }
-            else if (isUnitOfType(u,"Worker")) {
-                if (isEnemyUnit(u)) { _enemyWorkers.add(u);} else { _workers.add(u);}
-            }
-            else if (isUnitOfType(u,"Ranged")) {
-                if (isEnemyUnit(u)) { _enemyArchers.add(u);} else { _archers.add(u);}
-            }
-            else if (isUnitOfType(u,"Heavy")) {
-                if (isEnemyUnit(u)) { _enemyHeavies.add(u);} else { _heavies.add(u);}
-            }
-            else if (isUnitOfType(u,"Light")) {
-                if (isEnemyUnit(u)) {  _enemyLights.add(u);} else {  _lights.add(u);}
-            }
+            else if (u.getType() == _utt.getUnitType("Base") && isEnemyUnit(u))
+                _enemyBases.add(u);
+            else if (u.getType() == _utt.getUnitType("Base"))
+                _bases.add(u);
+            else if (u.getType() == _utt.getUnitType("Barracks") && isEnemyUnit(u))
+                _enemyBarracks.add(u);
+            else if (u.getType() == _utt.getUnitType("Barracks"))
+                _barracks.add(u);
+            else if (u.getType() == _utt.getUnitType("Worker") && isEnemyUnit(u))
+                _enemyWorkers.add(u);
+            else if (u.getType() == _utt.getUnitType("Worker"))
+                _workers.add(u);
+            else if (u.getType() == _utt.getUnitType("Ranged") && isEnemyUnit(u))
+                _enemyArchers.add(u);
+            else if (u.getType() == _utt.getUnitType("Ranged"))
+                _archers.add(u);
+            else if (u.getType() == _utt.getUnitType("Heavy") && isEnemyUnit(u))
+                _enemyHeavies.add(u);
+            else if (u.getType() == _utt.getUnitType("Heavy"))
+                _heavies.add(u);
+            else if (u.getType() == _utt.getUnitType("Light") && isEnemyUnit(u))
+                _enemyLights.add(u);
+            else if (u.getType() == _utt.getUnitType("Light"))
+                _lights.add(u);     
         }
 
         for (Unit u : _pgs.getUnits()) {
-            
-            if (u.getType().isResource) continue;
-
+            if(u.getType().isResource)
+                continue;
             _all.add(u);
-            if (isEnemyUnit(u)) {
+            if (isEnemyUnit(u))
                 _enemies.add(u);
-            } else {
+            else
                 _allyUnits.add(u);
-            }
-            
-            if (isEnemyUnit(u) && u.getType().canAttack) {
+            if(isEnemyUnit(u) && u.getType().canAttack)
                 _enemiesCombat.add(u);
-            } else if(u.getType().canAttack) {
+            else if(u.getType().canAttack)
                 _allyCombat.add(u);
-            }
         }
         
         _futureBarracks = new ArrayList<>();
         _futureLights = 0;
         _enemyFutureLights = 0;
-
         for (Unit u : _all) { //todo big change that was ally by mistake
             UnitActionAssignment aa = _gs.getActionAssignment(u);
-            if (aa == null)
+            if(aa == null)
                 continue;
             if (aa.action.getType() != UnitAction.TYPE_PRODUCE)
                 continue;
@@ -1152,33 +1237,28 @@ public class lightari extends AIWithComputationBudget {
             lockPos(u.getX(), u.getY(), aa.action.getDirection());
              
             UnitType ut = aa.action.getUnitType();
-
-            if (isEnemyUnit(u)) {
-                if (aa.action.getUnitType() == _utt.getUnitType("Light")) {
-                    _enemyFutureLights += 1;
-                }
-            } else {
-                if (ut != null) {
-                    _resourcesUsed += aa.action.getUnitType().cost; 
-                }
-                if (ut == _utt.getUnitType("Barracks")) {
-                    //todo this was aa.action.x which was 0 big change
-                    Pos p = futurePos(u.getX(), u.getY(), aa.action.getDirection()); 
-                    _futureBarracks.add(p);
-                }
-                else if (ut == _utt.getUnitType("Light")) {
-                    _futureLights += 1;
-                }
+            
+            if (!isEnemyUnit(u) && (ut != null))
+                _resourcesUsed += aa.action.getUnitType().cost; 
+        
+            if (!isEnemyUnit(u) && ut == _utt.getUnitType("Barracks")) {
+                Pos p = futurePos(u.getX(), u.getY(), aa.action.getDirection()); //todo this was aa.action.x which was 0 big change
+                _futureBarracks.add(p);
             }
+            if (!isEnemyUnit(u) && ut == _utt.getUnitType("Light")) {
+                _futureLights += 1;
+            }
+            if(isEnemyUnit(u) && aa.action.getUnitType() == _utt.getUnitType("Light"))
+                _enemyFutureLights += 1;
         }
         
         for (Unit u : _all) {
             UnitActionAssignment aa = _gs.getActionAssignment(u);
-            if (aa == null)
+            if(aa == null)
                 continue;
             if (aa.action.getType() != UnitAction.TYPE_ATTACK_LOCATION)
                 continue;
-            Unit t = _pgs.getUnitAt(aa.action.getLocationX(), aa.action.getLocationY());
+            Unit t = _pgs.getUnitAt( aa.action.getLocationX(), aa.action.getLocationY());
             if (t == null)
                 continue;
             if (!_newDmgs.containsKey(t))
@@ -1202,7 +1282,9 @@ public class lightari extends AIWithComputationBudget {
     
     void freeBlocks(List<Unit> units) {
         for (Unit u : units) {
-            if (busy(u)) continue;
+            if (busy(u))
+                continue;
+            
             List<Pos> poses = allPosDist(toPos(u), 1);
             boolean somebodyNear = false;
             for (Pos p : poses) {
@@ -1211,7 +1293,8 @@ public class lightari extends AIWithComputationBudget {
                     break;
                 }
             }
-            if (somebodyNear) tryMoveAway(u, u);
+            if (somebodyNear)
+                tryMoveAway(u, u);
         }
     }
     
@@ -1226,20 +1309,23 @@ public class lightari extends AIWithComputationBudget {
         
         init();
         
+        attackNearby(); //fight whoever is near
+        
         buildBracks();
         buildBase();
         barracksAction();
         basesAction();
         
         workerAction();
-        if (shouldWorkersAttack()) {
-            moveCombatUnits(_workers, 35);
-        } else {
+        
+        if (shouldWorkersAttack())
+            goCombat(_workers, 35);
+        else
             freeBlocks(_workers);
-        }
-
-        moveCombatUnits(_lights, 50);
-        moveCombatUnits(_archers, 15);
+        
+        goCombat(_lights, 30);
+        goCombat(_archers, 15);
+        //goCombat(_lights, 5);
         
         //if (_pgs.getWidth() >= 9)
         

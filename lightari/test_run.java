@@ -24,6 +24,7 @@ import ai.JZ.MixedBot;
 import ai.competition.tiamat.Tiamat;
 import mayariBot.mayari;
 import lightari.lightari; //My Bot
+//import lightari_old.lightari_old;
 
  /**
  *
@@ -86,6 +87,7 @@ class GameVisualSimulationTest {
                 case "mixedbot": return new MixedBot(utt);
                 case "tiamat": return new Tiamat(utt);
                 case "agentp": return new AgentP(utt);
+                //case "lightari_old": return new lightari_old(utt);
                 default: System.out.print("Error: Invalid Bot Name. Defaulting to Mayari");
             };
         }

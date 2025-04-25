@@ -55,29 +55,30 @@ $(res_out): $(res_src)
 .PHONY: comp
 
 # 3: create a single JAR file with sources and dependencies
-comp $(target): bin
+comp $(target): bin/ai bin/$(bot_dir)
 	@echo "Creating $(target) ..."
 	@./make_game.sh
+	
+# 2: extract the contents of the JAR dependencies
+bin/$(bot_dir): lib $(bot_trg)
+	@echo "Extracting Dependencies from ./lib ..."
+	@mkdir -p $@
+	@cd bin && find ../lib -name "*.jar" | xargs -n 1 jar xf
 
 # 1: compile source files
-# 2: extract the contents of the JAR dependencies
-bin: lib src
+bin/ai: src
 	@echo "Compiling ./src ..."
 	@javac -cp "lib/*:src" -d bin $(shell find src -name "*.java")
-	@echo "Extracting Dependencies from ./lib ..."
-	@cd bin && find ../lib -name "*.jar" | xargs -n 1 jar xf
 
 #################################################################
 # Compile Bot
 
 .PHONY: bot jar
 
-bot $(bot_trg): $(bot_jar) | bin/$(bot_dir) 
+bot $(bot_trg): $(bot_jar)
 	@cp $(bot_jar) $(bot_trg)
+	@mkdir -p bin/$(bot_dir)
 	@cp $(bot_cls) bin/$(bot_dir)
-
-bin/$(bot_dir):
-	@mkdir $@
 
 jar $(bot_jar): $(bot_cls)
 	@echo "Creating bot .jar file ..."
